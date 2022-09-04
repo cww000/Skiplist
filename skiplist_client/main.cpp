@@ -14,7 +14,7 @@ using namespace std;
 
 //定义程序中使用的常量      
 #define SERVER_ADDRESS "127.0.0.1" //服务器端IP地址      
-#define PORT           5150         //服务器的端口号
+#define PORT           9877         //服务器的端口号
 #define MAXSIZE        1024         //收发缓冲区的大小 
 
 int main()

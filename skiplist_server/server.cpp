@@ -71,8 +71,9 @@ void initDB() {
 }
 
 
-void Server::workerThread(Client*& c)
+void Server::workerThread(int fd)
 {
+    Client* c = clients.find(fd)->second;
     std::cout << "event trigger once\n";
     char recvBuf[MAXSIZE];
     while (1) {
@@ -303,10 +304,7 @@ void Server::start()
             if (fd == listenfd) {
                 processListen(fd);
             } else if (event[i].events & EPOLLIN) {
-             //   auto c = clients.find(fd)->second;
-//                myDB* db = clients.find(fd)->second;
-                Client* c = clients.find(fd)->second;
-                threadPool->AddTask(std::bind(&Server::workerThread, this, ref(c)));
+                threadPool->AddTask(std::bind(&Server::workerThread, this, fd));
             }
         }
     }

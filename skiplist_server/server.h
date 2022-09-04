@@ -30,7 +30,7 @@ class Server{
 public:
     Server(int num);
     void start();
-    void workerThread(Client*& c);
+    void workerThread(int fd);
 private:
     int listenfd;
     struct sockaddr_in local;
