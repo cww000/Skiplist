@@ -2,9 +2,6 @@
 #include <string.h>
 using namespace std;
 
-#define STORE_FILE "/root/dumpFile.txt"
-
-
 //创造节点
 // create new node
 template<typename K, typename V>
@@ -315,9 +312,9 @@ void Skiplist<K,V>::get_key_value_from_string(const string& str, string& key, st
 }
 
 template<typename K,typename V>
-void Skiplist<K,V>::dump_file(){
+void Skiplist<K,V>::dump_file(string path){
     //cout<<"dump_file-------------"<<endl;
-    _file_writer.open(STORE_FILE);
+    _file_writer.open(path);
     Node<K,V> *node=this->_header->forward[0];
 
     while(node != nullptr){
@@ -331,19 +328,18 @@ void Skiplist<K,V>::dump_file(){
 }
 
 template<typename K,typename V>
-void Skiplist<K,V>::load_file(){
+void Skiplist<K,V>::load_file(string path){
    // lock_guard<mutex> lock(mtx);
     //cout<<"load_file-------------"<<endl;
-    _file_reader.open(STORE_FILE);
+    _file_reader.open(path);
     string line;
     string key, value;
     while(getline(_file_reader,line)){
-        get_key_value_from_string(line, key,value);
+        get_key_value_from_string(line, key,value);  //分割 ：左边和右边的 key 和 value
         if(key.empty()||value.empty()){
             continue;
         }
         insert_element(key, value);
-        //cout<<"key: "<<*key<<" value: "<<*value<<endl;
     }
 
     _file_reader.close();

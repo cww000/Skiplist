@@ -109,11 +109,8 @@ void stress_test()
     pthread_exit(0);
 }
 int main() {
-
-   // stress_test();  //压力测试，处理十万各插入或删除
     Server server(10);
     server.start();
-  //  delete server;
     return 0;
 
 }

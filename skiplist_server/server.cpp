@@ -26,12 +26,9 @@ using namespace std;
 
 
 //服务器需要一个存放资源的db数组，每个客户端一连接，
-//就创建一个Client，并且让它与对应的数据库db[i]绑定
-//db中是一个字典构成的数组，让对应的Client存放key-value
-//客户端输入命令，服务器对命令进行拆分，在自己的命令
-//集合中查询命令是否合法后，相应的命令。
-//客户端若执行set命令，则将key-value存储在db的字典数组中，最后返回响应给客户端。
-
+//就创建一个Client，存放key-value的集合
+//客户端输入对应的命令，服务器对命令进行解析，在自己的命令集合
+//中进行查找并执行。
 
 //set命令
 void setCommand(Client* client, string key, string& value, bool& flag) {
@@ -44,23 +41,23 @@ void getCommand(Client* client, string key, string& value, bool& flag) {
 }
 
 //del命令
-void delCommand(Client* client, string key, string& value, bool& flag) {
+void delCommand(Client* client, string key,bool& flag) {
     flag=client->db.delete_element(key);
 	
 }
 
 //load命令
-void loadCommand(Client* client, string key, string& value, bool& flag) {
-    client->db.load_file();
+void loadCommand(Client* client, string path) {
+    client->db.load_file(path);
 }
 
 //dump命令
-void dumpCommand(Client* client, string key, string& value, bool& flag) {
-    client->db.dump_file();
+void dumpCommand(Client* client, string path) {
+    client->db.dump_file(path);
 }
 
 //display命令
-void displayCommand(Client* client, string key, string& value, bool& flag) {
+void displayCommand(Client* client) {
     client->db.display_list();
 }
 
@@ -73,7 +70,7 @@ void initDB() {
 
 void Server::workerThread(int fd)
 {
-    Client* c = clients.find(fd)->second;
+    Client* c = _clients.find(fd)->second;  //找到当前线程所对应的客户端
     std::cout << "event trigger once\n";
     char recvBuf[MAXSIZE];
     while (1) {
@@ -115,50 +112,38 @@ void Server::workerThread(int fd)
             }
 
             if (C._arg[0] == "display") {
-                processDisplay(C, c);
+                processDisplay(c);
             }
         }
     }
 }
 
 
-Server::Server(int num) : epoller(new Epoller()), threadPool(new ThreadPool(num))
+Server::Server(int num) : _epoller(new Epoller()), _threadPool(new ThreadPool(num))
 {
     //初始化服务端
     initServer();
     //初始化数据库
     initDB();
 
-    //初始化命令库
-    initCommand();
-}
-
-void Server::initCommand()
-{
-    Commands.insert(pair<string, CommandFun>("set", &setCommand));
-    Commands.insert(pair<string, CommandFun>("get", &getCommand));
-    Commands.insert(pair<string, CommandFun>("del", &delCommand));
-    Commands.insert(pair<string, CommandFun>("load", &loadCommand));
-    Commands.insert(pair<string, CommandFun>("dump", &dumpCommand));
-    Commands.insert(pair<string, CommandFun>("display", &displayCommand));
 }
 
 void Server::initServer()
 {
     //创建客户端的套接字
-    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    _listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
-    bzero(&local, sizeof(local));
+    bzero(&_local, sizeof(_local));
     //绑定
-    local.sin_family = AF_INET;
-    local.sin_port = htons(PORT);
-    local.sin_addr.s_addr = htonl(INADDR_ANY);
-    bind(listenfd, (struct sockaddr*)&(local), sizeof(local));
+    _local.sin_family = AF_INET;
+    _local.sin_port = htons(PORT);
+    _local.sin_addr.s_addr = htonl(INADDR_ANY);
+    bind(_listenfd, (struct sockaddr*)&(_local), sizeof(_local));
 
     //监听
     //1表示等待连接队列的x最大长度
-    listen(listenfd, 5);
-    epoller->addfd(listenfd);
+    listen(_listenfd, 5);
+    _epoller->addfd(_listenfd);
 }
 
 void Server::processListen(int fd)
@@ -172,15 +157,13 @@ void Server::processListen(int fd)
         return;
     }
     client->sockfd = connfd;
-  //  std::cout << client->sockfd << " " << clilen << std::endl;
-//    client->sockfd = accept(listenfd, (struct sockaddr*)&client->cliaddr, &clilen);
 
     cout << "Accepted client:" << inet_ntoa((client->cliaddr).sin_addr) << " : "
         << ntohs((client->cliaddr).sin_port) << endl;
 
     //增加与服务端关联的客户端数量
-    clients[connfd] = client;
-    epoller->addfd(connfd);  //将获取到的已连接套接字注册到内核事件表中
+    _clients[connfd] = client;
+    _epoller->addfd(connfd);  //将获取到的已连接套接字注册到内核事件表中
     cout << "a new client" << endl;
 }
 
@@ -189,10 +172,7 @@ void Server::processSet(const Command &C,  Client *c)
     string key = C._arg[1];
     string value = C._arg[2];
     bool flag = true;
-//    auto it = Commands.find("set");
-//    CommandFun cmd = it->second;
-//    cmd(c, key, value, flag);
-    setCommand(c, key, value, flag);
+    setCommand(c, key, value, flag);   //将指定键值对插入到当前数据库
     string str;
     if (flag) {
         //向客户端发送数据
@@ -209,12 +189,7 @@ void Server::processGet(const Command &C, Client *c)
     string key = C._arg[1];
     string value = "";
     bool flag = true;
-    //cout << C._arg[0] << " " << C._arg[1] << endl;
-
-//    auto it = Commands.find("get");
-//    CommandFun cmd = it->second;
-//    cmd(c, key, value, flag);
-    getCommand(c, key, value, flag);
+    getCommand(c, key, value, flag); //查询某个键对应的值
     if (flag) {
         string s = key + ":" + value;
         char* str = s.data();
@@ -229,12 +204,11 @@ void Server::processGet(const Command &C, Client *c)
 void Server::processDel(const Command &C, Client *c)
 {
     string key = C._arg[1];
-    string value = "";
     bool flag = true;
 //    auto it = Commands.find("del");
 //    CommandFun cmd = it->second;
 //    cmd(c, key, value, flag);
-    delCommand(c, key, value, flag);
+    delCommand(c, key, flag);   //删除指定 key 的键值对
     if (flag) {
         string sendMessage = "Successfully delete";
         send(c->sockfd, sendMessage.data(), strlen(sendMessage.data()) + sizeof(char), 0);
@@ -247,48 +221,21 @@ void Server::processDel(const Command &C, Client *c)
 
 void Server::processload(const Command &C, Client *c)
 {
-    //符合命令格式
-    //获得键值
-    string key = "";
-    string value = "";
-    bool flag = true;
-    //cout << C._arg[0] << " " << C._arg[1] << endl;
-//    auto it = Commands.find("load");
-//    CommandFun cmd = it->second;
-//    cmd(c, key, value,flag);
-    loadCommand(c, key, value, flag);
+    loadCommand(c, C._arg[1]);  //将指定文件中的数据加载到当前数据库
     string sendMessage = "Successfully load";
     send(c->sockfd, sendMessage.data(), strlen(sendMessage.data()) + sizeof(char), 0);
 }
 
 void Server::processDump(const Command &C, Client *c)
 {
-    //符合命令格式
-    //获得键值
-    string key = "";
-    string value = "";
-    bool flag = true;
-    //cout << C._arg[0] << " " << C._arg[1] << endl;
-//    auto it = Commands.find("dump");
-//    CommandFun cmd = it->second;
-//    cmd(c, key, value, flag);
-    dumpCommand(c, key, value, flag);
+    dumpCommand(c, C._arg[1]);  //磁盘落地，存储当前数据
     string sendMessage = "Succssfully dump";
     send(c->sockfd, sendMessage.data(), strlen(sendMessage.data()) + sizeof(char), 0);
 }
 
-void Server::processDisplay(const Command &C, Client *c)
+void Server::processDisplay(Client *c)
 {
-    //符合命令格式
-    //获得键值
-    string key = "";
-    string value = "";
-    bool flag = true;
-    //cout << C._arg[0] << " " << C._arg[1] << endl;
-//    auto it = Commands.find("display");
-//    CommandFun cmd = it->second;
-//    cmd(c, key, value, flag);
-    displayCommand(c, key, value, flag);
+    displayCommand(c);  //
     string sendMessage = "search all successfully";
     send(c->sockfd, sendMessage.data(), strlen(sendMessage.data()) + sizeof(char), 0);
 }
@@ -296,15 +243,15 @@ void Server::processDisplay(const Command &C, Client *c)
 void Server::start()
 {
     while (1) {
-        int ret = epoller->getReadSocket();
+        int ret = _epoller->getReadSocket();
         if (ret < 0) continue;
-        epoll_event* event = epoller->getEvents();
+        epoll_event* event = _epoller->getEvents();
         for (int i = 0; i < ret; i++) {
             int fd = event[i].data.fd;
-            if (fd == listenfd) {
+            if (fd == _listenfd) {
                 processListen(fd);
             } else if (event[i].events & EPOLLIN) {
-                threadPool->AddTask(std::bind(&Server::workerThread, this, fd));
+                _threadPool->AddTask(std::bind(&Server::workerThread, this, fd));
             }
         }
     }

@@ -63,12 +63,12 @@ bool Command::is_valid_command() {
         print_error(4);
         return false;
     }
-    if (_order == _all_order[3] && _arg.size() != 1) {
+    if (_order == _all_order[3] && _arg.size() != 2) {
         print_error(5);
         return false;
     }
 
-    if (_order == _all_order[4] && _arg.size() != 1) {
+    if (_order == _all_order[4] && _arg.size() != 2) {
         print_error(6);
         return false;
     }

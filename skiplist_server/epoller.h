@@ -12,8 +12,8 @@ public:
     int getReadSocket();
     epoll_event* getEvents();
 private:
-    int epollfd;
-    epoll_event events[MAXSIZE];
+    int _epollfd;
+    epoll_event _events[MAXSIZE];
 };
 
 #endif // EPOLLER_H

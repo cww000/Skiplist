@@ -27,8 +27,8 @@ public:
     void display_list();
     bool search_element(K, V&);
     bool delete_element(K);
-    void dump_file();
-    void load_file();
+    void dump_file(std::string path);
+    void load_file(std::string path);
     int size();
 
 private:
